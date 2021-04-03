@@ -1,0 +1,58 @@
+<script
+  language="javascript"
+  type="text/javascript"
+  src="http://hdbdevenv:8080/sites/SharePro/SiteAssets/plugin/jquery.min.js"
+></script>
+<script language="javascript" type="text/javascript">
+  var oListItem;
+
+  function AddCustomUserAction() {
+    console.log("hi");
+    var userActionExtension = "";
+
+    //Get the client context and list object
+    var context = new SP.ClientContext.get_current();
+    var list = context.get_web().get_lists().getByTitle("PageUsageLog");
+    //Get the custom user action collection and add the user action
+    var customUserAction = list.get_userCustomActions().add();
+    //Set the location of the user action
+    customUserAction.set_location("CommandUI.Ribbon.ListView");
+    //Add the properties for the custom action
+    userActionExtension =
+      '<CommandUIExtension xmlns="http://schemas.microsoft.com/sharepoint/">' +
+      "<CommandUIDefinitions>" +
+      '<CommandUIDefinition Location="Ribbon.List.CustomizeList.Controls._children">' +
+      '<Button Id="Ribbon.Documents.New.RibbonTest" ' +
+      'Command="Notify" ' +
+      'Sequence="0" ' +
+      'Image16by16="/_layouts/images/NoteBoard_16x16.png" ' +
+      'Image32by32="/_layouts/images/NoteBoard_32x32.png" ' +
+      'Description="Shows the ID of the current list." ' +
+      'LabelText="Show List ID" ' +
+      'TemplateAlias="o1"/>' +
+      "</CommandUIDefinition>" +
+      "</CommandUIDefinitions>" +
+      "<CommandUIHandlers>" +
+      '<CommandUIHandler Command="Notify" ' +
+      "CommandAction=\"javascript:SP.UI.Notify.addNotification('ListId={ListId}');\" />" +
+      "</CommandUIHandlers>" +
+      "</CommandUIExtension>";
+    //Add the command UI extension and update the custom user action
+    customUserAction.set_commandUIExtension(userActionExtension);
+    customUserAction.update();
+    //Load the client context and execute the batch
+    context.load(list, "UserCustomActions");
+    context.executeQueryAsync(
+      function () {
+        console.log("Custom User Action added successfully to ribbon.");
+      },
+      function (sender, args) {
+        console.log(args.get_message());
+      }
+    );
+  }
+
+  $(document).ready(function () {
+    SP.SOD.executeFunc("sp.js", "SP.ClientContext", AddCustomUserAction);
+  });
+</script>

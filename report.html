@@ -1,0 +1,212 @@
+<link rel="stylesheet" href="http://hdbdevenv:8080/sites/SharePro/Style%20Library/MyNewScript/jquery-ui.min.css">
+<script  type="text/javascript" src="http://hdbdevenv:8080/sites/SharePro/Style%20Library/MyNewScript/jquery-3.5.1.min.js"></script> 
+<!--<script  type="text/javascript" src="/sites/SharePro/Style%20Library/MyNewScript/jquery-ui.min.js"></script>-->
+<!--<script  type="text/javascript" src="/_layouts/sp.js"></script>-->
+<div>
+   <p>From: <input type="text" id="fromDate"/></p>
+   <p>To : <input type="text" id="toDate"/></p>
+   <button type="button" onclick="getReportClicked()"> Download as CSV </button>
+</div>
+<script type="text/javascript">
+   var gAllData = [];
+   function getReportClicked(){
+     var from =     $("#fromDate").val();
+     var to =     $("#toDate").val();
+   
+     var fromArr =     $("#fromDate").val().split('/');
+     var toArr =     $("#toDate").val().split('/');
+   
+   
+     var fromDate =  new Date(fromArr[1]+"/"+ fromArr[0]+ "/"+ fromArr[2]);
+     var toDate =     new Date(toArr[1]+"/"+ toArr[0]+ "/"+ toArr[2]);   
+   
+     if(fromDate.getTime() >  toDate.getTime())
+     {
+       alert('Please pick the valid date');
+       return null;
+     }
+     var allDates = getDaysArray(fromDate,toDate);
+    
+     var cmlQuery = "<View>"; 
+           cmlQuery   += " <Query>";
+             cmlQuery  += " <Where>";   
+              cmlQuery  +=   getCAMLQueryForDates(allDates) 
+             cmlQuery  += " </Where>";
+           cmlQuery  += " </Query>";  
+         cmlQuery  += " </View>";     
+            var clientContext = new SP.ClientContext.get_current();
+           var oList = clientContext.get_web().get_lists().getByTitle("Page_Usage_Log");
+           var camlQuery = new SP.CamlQuery(); 
+                camlQuery.set_viewXml(cmlQuery);
+           this.collListItem = oList.getItems(camlQuery);
+           clientContext.load(collListItem, 'Include(Title, UserName, VisitedDate, HitCount)');
+   
+           clientContext.load(collListItem);	
+            
+           clientContext.executeQueryAsync(function(){			
+                var listItemEnumerator = collListItem.getEnumerator();		
+                gAllData= [];		
+               while (listItemEnumerator.moveNext()) { 
+                 var oListItem = listItemEnumerator.get_current();  
+                  var oData = new Object();
+                   oData.title  =   oListItem.get_item("Title");
+                   oData.userName  =   oListItem.get_item("UserName");
+                   oData.visitedDate  =   oListItem.get_item("VisitedDate");
+                   oData.hitCount  =   oListItem.get_item("HitCount");
+                  gAllData.push(oData);
+                }
+                streamDataToCSV(gAllData);
+   
+            }, function(sender, args){
+             console.log("Request failed. " + args.get_message() + "\n" + args.get_stackTrace());
+           });
+    
+   }
+
+   function streamDataToCSV(data){ 
+           let csvContent = "data:text/csv;charset=utf-8,";
+                 csvContent += "visited Date,title,user Name,hit Count" + "\r\n";     
+            data.forEach(function(rowArray) {
+                let row = ([rowArray.visitedDate,rowArray.title,rowArray.userName,rowArray.hitCount]).join(",");
+                csvContent += row + "\r\n";
+            }); 
+ 
+            var encodedUri = encodeURI(csvContent);
+              var link = document.createElement("a");
+              link.setAttribute("href", encodedUri);
+              link.setAttribute("download", "my_data.csv");
+              document.body.appendChild(link); // Required for FF
+
+              link.click(); 
+
+
+   }
+    
+   
+
+  //  function gropuingLigic(allData){  
+   
+  //    var formattedData = [];
+     
+  //     var grpByDate = groupBy(allData,'visitedDate');
+  //     var allDates = Object.keys(grpByDate);
+  //     for(var d=0;d < allDates.length;d++){
+  //        ////////////////////
+  //            var grpByUser = groupBy(grpByDate[allDates[d]],'userName');
+  //            var alluserNames = Object.keys(grpByUser);
+  //            for(var u=0;u < alluserNames.length;u++){
+  //            ///////////////////////////////////////////////////
+  //                var grpBytitle = groupBy(grpByUser[alluserNames[u]],'title');
+  //                  var alltitles = Object.keys(grpBytitle);
+  //                  for(var t=0;t < alltitles.length;t++){                       
+  //                         var finalList = grpBytitle[alltitles[t]];
+  //                         var hitCount = 0;
+  //                          for(var fin=0;fin < finalList.length;fin++){    
+  //                              hitCount = hitCount + parseInt(finalList[fin].hitCount);
+  //                          }         
+  //                            var oData = new Object();
+  //                              oData.visitedDate  =   allDates[d];
+  //                              oData.title  =  alltitles[t];
+  //                              oData.userName  =  alluserNames[u];
+  //                              oData.hitCount  =   hitCount;
+  //                            formattedData.push(oData);
+                                  
+  //                  }
+  //            ///////////////////////////////////////////////////
+  //        }
+  //      ///////////////
+  //    }   
+     
+  //    return formattedData;
+  //  }
+   
+   var getDaysArray = function(start, end) {
+       for(var arr=[],dt=new Date(start); dt<=end; dt.setDate(dt.getDate()+1)){
+           arr.push(new Date(dt));
+       }
+       return arr;
+   };
+    
+   function groupBy(objectArray, property) {
+      return objectArray.reduce((acc, obj) => {
+         const key = obj[property];
+         if (!acc[key]) {
+            acc[key] = [];
+         }
+         // Add object to list for given key's value
+         acc[key].push(obj);
+         return acc;
+      }, {});
+   }
+    
+   
+   var formatDate = function(curdt) {
+    return (curdt).getDate()+"_"+ ((curdt).getMonth()+1)+"_"+  (curdt).getFullYear();
+   };
+   
+   var getCAMLQueryForDates = function(dateArr){
+         var cmlQuery = '';
+           if(dateArr.length == 1){ 
+                        cmlQuery  += " <Eq>";
+                          cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                          cmlQuery  += " <Value Type='Text'>"+ formatDate(dateArr[0]) +"</Value>";
+                        cmlQuery  += " </Eq>";
+   
+           }else   if(dateArr.length == 2){
+                     cmlQuery  += " <Or>";
+   
+                        cmlQuery  += " <Eq>";
+                          cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                          cmlQuery  += " <Value Type='Text'>"+formatDate(dateArr[1]) +"</Value>";
+                        cmlQuery  += " </Eq>";
+   
+                       cmlQuery  += " <Eq>";
+                         cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                         cmlQuery  += " <Value Type='Text'>"+formatDate(dateArr[0]) +"</Value>";
+                       cmlQuery  += " </Eq>";   
+   
+                     cmlQuery  += " </Or>"; 
+           }else if(dateArr.length > 2){
+                 
+                           for(var i=(dateArr.length -1); i >= 0; i--){
+                                   if(i > 1){
+                                     cmlQuery  += " <Or>";
+                                       cmlQuery  += " <Eq>";
+                                         cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                                         cmlQuery  += " <Value Type='Text'>"+formatDate(dateArr[i]) +"</Value>";
+                                     cmlQuery  += " </Eq>";
+   
+                                   }else if(i == 1){
+                                     cmlQuery  += " <Or>"; 
+                                         cmlQuery  += " <Eq>";
+                                           cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                                           cmlQuery  += " <Value Type='Text'>"+formatDate(dateArr[1]) +"</Value>";
+                                         cmlQuery  += " </Eq>";
+   
+                                         cmlQuery  += " <Eq>";
+                                           cmlQuery  += " <FieldRef Name='VisitedDate' />";
+                                           cmlQuery  += " <Value Type='Text'>"+formatDate(dateArr[0]) +"</Value>";
+                                         cmlQuery  += " </Eq>";    
+                                       break;
+                                     }   
+                           }
+                           for(var i=1; i < dateArr.length; i++){
+                               cmlQuery  += " </Or>"; 
+                             } 
+           }
+           return cmlQuery;
+   
+   }
+  
+   
+   $(document).ready(function(){
+     var datePickerOptions = {
+                               dateFormat: 'd/m/yy',
+                               firstDay: 1,
+                               changeMonth: true,
+                               changeYear: true, 
+                             }
+           $("#fromDate").datepicker(datePickerOptions);
+           $("#toDate").datepicker(datePickerOptions); 
+   }); 
+</script>
